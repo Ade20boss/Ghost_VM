@@ -1297,32 +1297,85 @@ void run_vm(vm_t *vm){
 
     }
 }
+int main() {
+    // --- TEST 1 ASSETS: Polymorphic Multiplication ---
+    char *str_base = "ha";
+    int mult_val = 3;
 
-int main(){
-    float f1 = 10.0f;
-    float f2 = 20.0f;
-    float f3 = 30.0f;
-    float f4 = 2.0f;
-    
+    // --- TEST 2 ASSETS: Vector/Scalar Arithmetic ---
+    float v1 = 1.5f;
+    float v2 = 2.5f;
+    float v3 = 3.5f;
+    int scalar = 2; // Intentionally using an INT to test implicit float casting
+
+    // --- TEST 3 ASSETS: Destructive Collection Merging ---
+    int c1 = 10, c2 = 20;
+    int c3 = 30, c4 = 40;
+
+    // --- TEST 4 ASSETS: Heterogeneous String Concat ---
+    char *str_hello = "VM Architecture: ";
+    char *str_status = "STABLE.";
+
     size_t opcodes[] = {
-        OP_PUSH_FLOAT, *(size_t*)&f1,
-        OP_PUSH_FLOAT, *(size_t*)&f2,
-        OP_PUSH_FLOAT, *(size_t*)&f3,
-        OP_BUILD_VECTOR, 3,
-        OP_PUSH_FLOAT, *(size_t*)&f4,
-        OP_ADD,
+        // --------------------------------------------------------
+        // TEST 1: String repetition (STRING * INTEGER)
+        // Expected Output: hahahaha
+        // --------------------------------------------------------
+        OP_PUSH_STRING, (size_t)str_base,
+        OP_PUSH_INT, mult_val,
+        OP_MUL,                 
+        OP_PRINT,               
+
+        // --------------------------------------------------------
+        // TEST 2: Vector Math with Implicit Type Promotion
+        // Pushes 3 floats, builds a vector, multiplies by an INTEGER
+        // Expected Output: <3.000000, 5.000000, 7.000000>
+        // --------------------------------------------------------
+        OP_PUSH_FLOAT, *(size_t*)&v1,
+        OP_PUSH_FLOAT, *(size_t*)&v2,
+        OP_PUSH_FLOAT, *(size_t*)&v3,
+        OP_BUILD_VECTOR, 3,     
+        OP_PUSH_INT, scalar,    
+        OP_MUL,                 
+        OP_PRINT,               
+
+        // --------------------------------------------------------
+        // TEST 3: Destructive Move Semantics (The Memory Killer)
+        // Builds [10, 20] and [30, 40], merges them into [10, 20, 30, 40]
+        // This will immediately segfault if your length=0 memory fix fails.
+        // Expected Output: [10, 20, 30, 40]
+        // --------------------------------------------------------
+        OP_PUSH_INT, c1,
+        OP_PUSH_INT, c2,
+        OP_BUILD_COLLECTION, 2, 
+
+        OP_PUSH_INT, c3,
+        OP_PUSH_INT, c4,
+        OP_BUILD_COLLECTION, 2, 
+
+        OP_ADD,                 
+        OP_PRINT,               
+
+        // --------------------------------------------------------
+        // TEST 4: String Concatenation 
+        // Expected Output: VM Architecture: STABLE.
+        // --------------------------------------------------------
+        OP_PUSH_STRING, (size_t)str_hello,
+        OP_PUSH_STRING, (size_t)str_status,
+        OP_ADD,                 
         OP_PRINT,
-        OP_HALT,
+
+        OP_HALT
     };
 
-   vm_t *vm_test =  new_virtual_machine(opcodes);
-   run_vm(vm_test);
-   object_free(vm_test -> operand_stack);
-   free(vm_test);
+    printf("=== EXECUTING KERNEL STRESS TEST ===\n");
+    vm_t *stress_vm = new_virtual_machine(opcodes);
+    run_vm(stress_vm);
+    
+    // --- CRITICAL MEMORY SHUTDOWN ---
+    object_free(stress_vm->operand_stack);
+    free(stress_vm);
+    printf("=== VIRTUAL MACHINE TERMINATED ===\n");
 
-   return 0;
-
-
-
+    return 0;
 }
-
