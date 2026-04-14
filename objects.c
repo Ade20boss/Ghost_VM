@@ -3,6 +3,9 @@
 #include <string.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <math.h>
+
+#define EPSILON 0.00001
 
 typedef struct Object object_t;
 void object_free(object_t *obj);
@@ -92,7 +95,7 @@ object_t *new_object_integer(int value){
 //Float object constructor
 object_t *new_object_float(float value){
     //check above function, we're essentialy doing the same thing
-   object_t *new_obj = (object_t *)malloc(sizeof(object_t));
+   object_t *new_obj = malloc(sizeof(object_t));
    if (new_obj == NULL){
         return NULL;
    }
@@ -147,7 +150,7 @@ object_t *new_object_vector(size_t dimens, float *coords){
 
 object_t *new_object_collection(size_t capacity, bool is_stack) {
     //check if capacity is 0
-    if (capacity == 0){
+    if (capacity <= 0){
         fprintf(stderr, "Cannot initialize collection kind with 0 capacity\n");
         return NULL;
     }
@@ -280,12 +283,14 @@ object_t *collection_access(object_t *collection, size_t index){
 
 
 int is_empty(object_t *collection_stack){
-    if (collection_stack -> kind != COLLECTION){
-        fprintf(stderr, "Cannot perform empty function on non_collection kind");
-        return -1;
-    }
+
     if (collection_stack == NULL){
         fprintf(stderr, "Cannot perform empty function on null object\n");
+        return -1;
+    }
+    
+    if (collection_stack -> kind != COLLECTION){
+        fprintf(stderr, "Cannot perform empty function on non_collection kind");
         return -1;
     }
 
@@ -335,7 +340,7 @@ object_t *stack_peek(object_t *collection){
     }
 
     if ( collection -> data.v_collection.stack == false){
-        fprintf(stderr, "Cannot perform peek operation on non_stack kind");
+        fprintf(stderr, "Cannot perform peek operation on non_collection_stack kind");
         return NULL;
     }
 
@@ -345,8 +350,6 @@ object_t *stack_peek(object_t *collection){
     }
 
     return collection -> data.v_collection.data[collection -> data.v_collection.length - 1];
-
-
 
 }
 
@@ -517,8 +520,6 @@ object_t *object_add(object_t *a, object_t *b){
                 }
                 default:
                     fprintf(stderr,"Incompatible kinds");
-                    object_free(a);
-                    object_free(b);
                     return NULL;
 
             }
@@ -547,7 +548,7 @@ bool object_equals(object_t *a, object_t *b){
                 return false;
             }
         case FLOAT:
-            if(a -> data.v_float == b -> data.v_float){
+            if(fabsf(a -> data.v_float - b -> data.v_float) <= EPSILON){
                 return true;
             }
             else{
@@ -576,6 +577,24 @@ bool object_equals(object_t *a, object_t *b){
                 }
                 return true;
             }
+
+        case VECTOR:
+            if(b -> data.v_vector.dimensions != a -> data.v_vector.dimensions)
+            {
+                return false;
+            }
+            else
+            {
+                for (size_t i = 0; i < b -> data.v_vector.dimensions; i++)
+                {
+                    if(fabsf(b -> data.v_vector.coords[i] - a -> data.v_vector.coords[i]) >= EPSILON)
+                    {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
         default:
             return false;
 
@@ -602,6 +621,11 @@ object_t *object_clone(object_t *obj){
                 collection_append(collection_clone, object_clone(obj -> data.v_collection.data[i]));
             }
             return collection_clone;
+        }
+        case VECTOR:
+        {
+            object_t  *vector_clone = new_object_vector(obj -> data.v_vector.dimensions, obj -> data.v_vector.coords);
+            return vector_clone;
         }
         default:
             return NULL;
@@ -668,7 +692,9 @@ object_t *object_subtract(object_t *a, object_t *b){
                 object_free(popped_item);
             }
             
-            return a;
+            object_t *new_collection = object_clone(a);
+            return new_collection;
+
          case VECTOR:{
             switch(b -> kind){
                 case INTEGER:{
@@ -702,8 +728,6 @@ object_t *object_subtract(object_t *a, object_t *b){
                 case VECTOR:{
                     if (a -> data.v_vector.dimensions != b -> data.v_vector.dimensions){
                         fprintf(stderr, "Cannot perform element wise subtraction on vectors in different dimenstions");
-                        object_free(a);
-                        object_free(b);
                         return NULL;
                     }
                     float buffer[a -> data.v_vector.dimensions];
@@ -1025,6 +1049,11 @@ void print_object(object_t *obj1){
 }
 
 void print_collection_data(object_t *obj){
+    if (obj == NULL)
+    {
+        fprintf(stderr, "Cannot perform empty function on null object\n");
+        return;     
+    }
     if (obj -> kind != COLLECTION){
         fprintf(stderr, "Cannot print data of non_collection kind");
         return;
@@ -1037,6 +1066,11 @@ void print_collection_data(object_t *obj){
 
 
 int is_full(object_t *obj){
+    if (obj == NULL)
+    {
+        fprintf(stderr, "Cannot perform full function on null object\n");
+        return -1;     
+    }
     if (obj -> kind != COLLECTION){
         fprintf(stderr, "Object of non_collection kind cannot be empty");
         return -1;
@@ -1074,6 +1108,7 @@ void run_vm(vm_t *vm){
         fprintf(stderr, "[NULL ERROR] VM cannot run on null parameters\n");
         return;
     }
+
     printf("--- VM BOOT SEQUENCE INITIATED ---\n");
     while(true){
         size_t instruction = vm -> bytecode[vm -> ip];
@@ -1373,6 +1408,7 @@ int main() {
     run_vm(stress_vm);
     
     // --- CRITICAL MEMORY SHUTDOWN ---
+    // If Valgrind reports 0 leaks here, your dynamic ownership model is perfect.
     object_free(stress_vm->operand_stack);
     free(stress_vm);
     printf("=== VIRTUAL MACHINE TERMINATED ===\n");
