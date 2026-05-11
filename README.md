@@ -189,8 +189,6 @@ The checksum is computed over the entire packet with the `checksum` field zeroed
 
 This approach avoids having to split the hash computation around the checksum field — the packet is always hashed as a single contiguous region.
 
-**What FNV-1a does not provide:** FNV-1a detects accidental corruption. It does not provide authenticity. A network adversary who can observe and modify packets can compute a valid FNV-1a checksum for any payload they construct. For authenticated integrity, HMAC-SHA256 over the packet body would be the appropriate construction.
-
 ### The opcodebatch Flexible Array Member
 
 ```c
